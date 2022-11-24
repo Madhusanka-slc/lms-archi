@@ -1,4 +1,16 @@
 package lk.ijse.dep9.entity;
 
-public class Member {
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Member implements SuperEntity {
+    String id;
+    String name;
+    String address;
+    String contact;
 }

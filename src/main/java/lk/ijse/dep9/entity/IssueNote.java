@@ -1,4 +1,23 @@
 package lk.ijse.dep9.entity;
 
-public class IssueNote {
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+import java.sql.Date;
+
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class IssueNote implements SuperEntity {
+    private int id;
+    private Date date;
+    private String memberId;
+
+    public IssueNote(Date date, String memberId) {
+        this.date = date;
+        this.memberId = memberId;
+    }
 }

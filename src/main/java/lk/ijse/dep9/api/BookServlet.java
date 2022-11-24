@@ -8,13 +8,13 @@ import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.api.util.HttpServlet2;
 import lk.ijse.dep9.dto.BookDTO;
-import lk.ijse.dep9.dto.MemberDTO;
+import lk.ijse.dep9.service.BOLogic;
+import lk.ijse.dep9.util.ConnectionUtil;
 
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -256,24 +256,10 @@ public class BookServlet extends HttpServlet2 {
             }
 
             try (Connection connection = pool.getConnection()) {
+                ConnectionUtil.setConnection(connection);
 
-                PreparedStatement stmExist = connection.
-                        prepareStatement("SELECT isbn FROM book WHERE isbn = ?");
-                stmExist.setString(1, book.getIsbn());
-                if (stmExist.executeQuery().next()){
-                    response.sendError(HttpServletResponse.SC_CONFLICT, "Book already exists with this ISBN");
-                    return;
-                }
 
-                PreparedStatement stm = connection.
-                        prepareStatement("INSERT INTO book (isbn, title, author, copies) VALUES (?, ?, ?, ?)");
-                stm.setString(1, book.getIsbn());
-                stm.setString(2, book.getTitle());
-                stm.setString(3, book.getAuthor());
-                stm.setInt(4, book.getCopies());
-
-                int affectedRows = stm.executeUpdate();
-                if (affectedRows == 1) {
+                if (BOLogic.saveBook(book)) {
                     response.setStatus(HttpServletResponse.SC_CREATED);
                     response.setContentType("application/json");
                     JsonbBuilder.create().toJson(book, response.getWriter());
@@ -310,14 +296,9 @@ public class BookServlet extends HttpServlet2 {
             }
 
             try (Connection connection = pool.getConnection()) {
-                PreparedStatement stm = connection.
-                        prepareStatement("UPDATE book SET title=?, author=?, copies=? WHERE isbn=?");
-                stm.setString(1, book.getTitle());
-                stm.setString(2, book.getAuthor());
-                stm.setInt(3, book.getCopies());
-                stm.setString(4, book.getIsbn());
+                ConnectionUtil.setConnection(connection);
 
-                if (stm.executeUpdate() == 1) {
+                if (BOLogic.updateBook(book)) {
                     response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                 } else {
                     response.sendError(HttpServletResponse.SC_NOT_FOUND, "Book does not exist");

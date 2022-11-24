@@ -1,5 +1,7 @@
-package lk.ijse.dep9.dao.impl;
+package lk.ijse.dep9.dao.custom.impl;
 
+import lk.ijse.dep9.dao.custom.IssueItemDAO;
+import lk.ijse.dep9.dao.exception.ConstraintViolationException;
 import lk.ijse.dep9.entity.IssueItem;
 import lk.ijse.dep9.entity.IssueItemPK;
 
@@ -11,14 +13,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class IssueItemDAOImpl {
+public class IssueItemDAOImpl implements IssueItemDAO {
     private Connection connection;
 
     public IssueItemDAOImpl(Connection connection) {
         this.connection = connection;
     }
 
-    public long countIssueItems(){
+    @Override
+    public long count(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT COUNT(isbn) FROM issue_item");
             ResultSet rst = stm.executeQuery();
@@ -28,21 +31,22 @@ public class IssueItemDAOImpl {
             throw new RuntimeException(e);
         }
     }
-
-    public void deleteIssueItemByPK(IssueItemPK issueItemPK) throws ClassNotFoundException{
+    @Override
+    public void deleteById(IssueItemPK issueItemPK) throws ConstraintViolationException {
         try {
             PreparedStatement stm = connection.prepareStatement("DELETE FROM issue_item WHERE isbn=? AND issue_id=?");
             stm.setString(1, issueItemPK.getIsbn());
             stm.setInt(2,issueItemPK.getIssueId());
             stm.executeUpdate();
         } catch (SQLException e) {
-            if(existsIssueItemByPK(issueItemPK)) throw new ClassCastException("Issue Item primary key still exist within other tables");
+            if(existsById(issueItemPK)) throw new ClassCastException("Issue Item primary key still exist within other tables");
             throw new RuntimeException(e);
 
         }
 
     }
-    public boolean existsIssueItemByPK(IssueItemPK issueItemPK){
+    @Override
+    public boolean existsById(IssueItemPK issueItemPK){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_item WHERE isbn=? AND issue_id=?");
             stm.setString(1, issueItemPK.getIsbn());
@@ -53,8 +57,8 @@ public class IssueItemDAOImpl {
         }
 
     }
-
-    public List<IssueItem> findAllIssueItems(){
+    @Override
+    public List<IssueItem> findAll(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_item");
             ResultSet rst = stm.executeQuery();
@@ -71,7 +75,8 @@ public class IssueItemDAOImpl {
             throw new RuntimeException(e);
         }
     }
-    public Optional<IssueItem> findIssueItemByPK(IssueItemPK issueItemPK){
+    @Override
+    public Optional<IssueItem> findById(IssueItemPK issueItemPK){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_item WHERE isbn=? AND issue_id=?");
             stm.setString(1, issueItemPK.getIsbn());
@@ -92,8 +97,8 @@ public class IssueItemDAOImpl {
         }
 
     }
-
-    public IssueItem saveIssueItem(IssueItem issueItem){
+    @Override
+    public IssueItem save(IssueItem issueItem){
         try {
             PreparedStatement stm = connection.prepareStatement("INSERT INTO issue_item (issue_id, isbn) VALUES (?,?)");
             stm.setInt(1,issueItem.getIssueItemPK().getIssueId());
@@ -108,6 +113,17 @@ public class IssueItemDAOImpl {
         }
 
     }
+
+
+    @Override
+    public IssueItem update(IssueItem entity) throws ConstraintViolationException {
+        return null;
+    }
+//
+//    @Override
+//    public Object update(IssueItem entity) throws ClassNotFoundException {
+//        return null;
+//    }
 
 /*    public IssueItem updateIssueItem(IssueItem issueItem){
         return null;

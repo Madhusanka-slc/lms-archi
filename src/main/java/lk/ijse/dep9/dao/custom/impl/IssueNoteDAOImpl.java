@@ -1,5 +1,7 @@
-package lk.ijse.dep9.dao.impl;
+package lk.ijse.dep9.dao.custom.impl;
 
+import lk.ijse.dep9.dao.custom.IssueNoteDAO;
+import lk.ijse.dep9.dao.exception.ConstraintViolationException;
 import lk.ijse.dep9.entity.IssueNote;
 
 import java.sql.*;
@@ -8,15 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class IssueNoteDAOImpl {
+public class IssueNoteDAOImpl implements IssueNoteDAO {
     private Connection connection;
 
     public IssueNoteDAOImpl(Connection connection) {
 
         this.connection = connection;
     }
-
-    public long countIssueNotes(){
+    @Override
+    public long count(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT COUNT(id) FROM issue_note");
             ResultSet rst = stm.executeQuery();
@@ -28,19 +30,22 @@ public class IssueNoteDAOImpl {
         }
     }
 
-    public void deleteIssueNoteById(int id) throws ClassNotFoundException{
+    @Override
+    public void deleteById(Integer id) throws ConstraintViolationException {
         try {
             PreparedStatement stm = connection.prepareStatement("DELETE FROM issue_note WHERE id=?");
             stm.setInt(1,id);
             stm.executeUpdate();
         } catch (SQLException e) {
-            if(existsIssueNoteById(id)) throw new ClassCastException("Issue Note primary key still exist within other tables");
+            if(existsById(id)) throw new ClassCastException("Issue Note primary key still exist within other tables");
             throw new RuntimeException(e);
         }
 
 
     }
-    public boolean existsIssueNoteById(int id){
+
+    @Override
+    public boolean existsById(Integer id){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_note WHERE id=?");
             stm.setInt(1,id);
@@ -52,7 +57,8 @@ public class IssueNoteDAOImpl {
 
     }
 
-    public List<IssueNote> findAllIssueNotes(){
+    @Override
+    public List<IssueNote> findAll(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_note");
             ResultSet rst = stm.executeQuery();
@@ -70,7 +76,9 @@ public class IssueNoteDAOImpl {
 
 
     }
-    public Optional<IssueNote> findIssueNoteById(int id){
+
+    @Override
+    public Optional<IssueNote> findById(Integer id){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_note WHERE id=?");
             stm.setInt(1,id);
@@ -88,7 +96,8 @@ public class IssueNoteDAOImpl {
 
     }
 
-    public IssueNote saveIssueNote(IssueNote issueNote){
+    @Override
+    public IssueNote save(IssueNote issueNote){
         try {
             PreparedStatement stm = connection.prepareStatement("INSERT INTO issue_note (date,member_id) VALUES (?,?)");
             stm.setDate(1,Date.valueOf(LocalDate.now()));
@@ -104,7 +113,8 @@ public class IssueNoteDAOImpl {
 
     }
 
-    public IssueNote updateIssueNote(IssueNote issueNote){
+    @Override
+    public IssueNote update(IssueNote issueNote){
         try {
             PreparedStatement stm = connection.prepareStatement("UPDATE issue_note SET date=?,member_id=? WHERE id=?");
             stm.setDate(1, issueNote.getDate());

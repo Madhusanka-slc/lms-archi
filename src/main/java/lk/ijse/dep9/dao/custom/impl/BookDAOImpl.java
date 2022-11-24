@@ -1,5 +1,7 @@
-package lk.ijse.dep9.dao.impl;
+package lk.ijse.dep9.dao.custom.impl;
 
+import lk.ijse.dep9.dao.custom.BookDAO;
+import lk.ijse.dep9.dao.exception.ConstraintViolationException;
 import lk.ijse.dep9.entity.Book;
 
 import java.sql.Connection;
@@ -10,15 +12,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class BookDAOImpl {
+public class BookDAOImpl implements BookDAO {
 
     private Connection connection;
 
     public BookDAOImpl(Connection connection) {
         this.connection = connection;
     }
-
-    public long countBooks(){
+    @Override
+    public long count(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT COUNT(isbn) FROM book");
             ResultSet rst = stm.executeQuery();
@@ -29,8 +31,8 @@ public class BookDAOImpl {
         }
 
     }
-
-    public void deleteBookByISBN(String isbn) throws ClassNotFoundException{
+    @Override
+    public void deleteById(String isbn) throws ConstraintViolationException {
         try {
             PreparedStatement stm = connection.prepareStatement("DELETE FROM book WHERE isbn=?");
             stm.setString(1,isbn);
@@ -38,12 +40,13 @@ public class BookDAOImpl {
 
 
         } catch (SQLException e) {
-            if(existsBookByISBN(isbn)) throw new ClassCastException("Book ISBN still exist within other tables");
+            if(existsById(isbn)) throw new ClassCastException("Book ISBN still exist within other tables");
             throw new RuntimeException(e);
         }
 
     }
-    public boolean existsBookByISBN(String isbn){
+    @Override
+    public boolean existsById(String isbn){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT isbn FROM book WHERE  isbn=?");
             stm.setString(1,isbn);
@@ -54,7 +57,8 @@ public class BookDAOImpl {
 
     }
 
-    public List<Book> findAllBooks(){
+    @Override
+    public List<Book> findAll(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  book");
             ResultSet rst = stm.executeQuery();
@@ -73,28 +77,8 @@ public class BookDAOImpl {
 
     }
 
-    public List<Book> findAllBooks(int size,int page){
-        try {
-            PreparedStatement stm = connection.prepareStatement("SELECT * FROM  book LIMIT ? OFFSET ?");
-            stm.setInt(1,size);
-            stm.setInt(2,(page-1)*size);
-            ResultSet rst = stm.executeQuery();
-            ArrayList<Book> bookList = new ArrayList<>();
-            while (rst.next()) {
-                String isbn = rst.getString("isbn");
-                String title = rst.getString("title");
-                String author = rst.getString("author");
-                int copies = rst.getInt("copies");
-                bookList.add(new Book(isbn,title,author,copies));
-            }
-            return bookList;
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
-
-    public Optional<Book> findBookByISBN(String isbn){
+    @Override
+    public Optional<Book> findById(String isbn){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM book WHERE isbn=?");
             stm.setString(1,isbn);
@@ -114,7 +98,8 @@ public class BookDAOImpl {
         }
     }
 
-    public Book saveBook(Book book){
+    @Override
+    public Book save(Book book){
         try {
             PreparedStatement stm = connection.prepareStatement("INSERT INTO book (isbn,title,author,copies) VALUES (?,?,?,?)");
             stm.setString(1, book.getIsbn());
@@ -131,7 +116,9 @@ public class BookDAOImpl {
             throw new RuntimeException(e);
         }
     }
-    public Book updateBook(Book book){
+
+    @Override
+    public Book update(Book book){
         try {
             PreparedStatement stm = connection.prepareStatement("UPDATE book SET title=?, author=?, copies=? WHERE isbn=?");
             stm.setString(1, book.getTitle());
@@ -149,7 +136,7 @@ public class BookDAOImpl {
         }
 
     }
-
+    @Override
     public List<Book> findBooksByQuery(String query){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  book WHERE isbn LIKE ? OR  title LIKE ? OR author LIKE ?");
@@ -175,7 +162,7 @@ public class BookDAOImpl {
         }
     }
 
-
+    @Override
     public List<Book> findBooksByQuery(String query,int size,int page){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  book WHERE isbn LIKE ? OR  title LIKE ? OR author LIKE ? LIMIT ? OFFSET ?");
@@ -201,6 +188,28 @@ public class BookDAOImpl {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public List<Book> findAllBooks(int size,int page){
+        try {
+            PreparedStatement stm = connection.prepareStatement("SELECT * FROM  book LIMIT ? OFFSET ?");
+            stm.setInt(1,size);
+            stm.setInt(2,(page-1)*size);
+            ResultSet rst = stm.executeQuery();
+            ArrayList<Book> bookList = new ArrayList<>();
+            while (rst.next()) {
+                String isbn = rst.getString("isbn");
+                String title = rst.getString("title");
+                String author = rst.getString("author");
+                int copies = rst.getInt("copies");
+                bookList.add(new Book(isbn,title,author,copies));
+            }
+            return bookList;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
 }

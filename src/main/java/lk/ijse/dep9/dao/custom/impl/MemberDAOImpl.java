@@ -1,5 +1,6 @@
-package lk.ijse.dep9.dao.impl;
+package lk.ijse.dep9.dao.custom.impl;
 
+import lk.ijse.dep9.dao.custom.MemberDAO;
 import lk.ijse.dep9.dao.exception.ConstraintViolationException;
 import lk.ijse.dep9.entity.Member;
 
@@ -11,7 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class MemberDAOImpl {
+public class MemberDAOImpl implements MemberDAO {
+
 
     private Connection connection;
 
@@ -20,7 +22,8 @@ public class MemberDAOImpl {
         this.connection = connection;
     }
 
-    public long countMembers(){
+    @Override
+    public long count(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT COUNT(id) FROM member");
             ResultSet rst = stm.executeQuery();
@@ -31,8 +34,8 @@ public class MemberDAOImpl {
         }
 
     }
-
-    public void deleteMemberByMemberId(String id) throws ConstraintViolationException {
+    @Override
+    public void deleteById(String id) throws ConstraintViolationException {
         try {
             PreparedStatement stm = connection.prepareStatement("DELETE FROM member WHERE id=?");
             stm.setString(1,id);
@@ -40,12 +43,13 @@ public class MemberDAOImpl {
 
 
         } catch (SQLException e) {
-            if(existsMemberByMemberId(id)) throw new ConstraintViolationException("Member ID still exist in other tables",e);
+            if(existsById(id)) throw new ConstraintViolationException("Member ID still exist in other tables",e);
             throw new RuntimeException(e);
         }
 
     }
-    public boolean existsMemberByMemberId(String id){
+    @Override
+    public boolean existsById(String id){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT id FROM member WHERE  id=?");
             stm.setString(1,id);
@@ -56,7 +60,8 @@ public class MemberDAOImpl {
 
     }
 
-    public List<Member> findAllMembers(){
+    @Override
+    public List<Member> findAll(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  member");
             ResultSet rst = stm.executeQuery();
@@ -75,6 +80,19 @@ public class MemberDAOImpl {
 
     }
 
+    @Override
+    public boolean existsByContact(String contact) {
+        try {
+            PreparedStatement stm = connection.prepareStatement("SELECT * FROM member WHERE contact=?");
+            stm.setString(1,contact);
+            return stm.executeQuery().next();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Override
     public List<Member> findAllMembers(int size,int page){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  member LIMIT ? OFFSET ?");
@@ -96,7 +114,8 @@ public class MemberDAOImpl {
 
     }
 
-    public Optional<Member> findMemberByMemberId(String id){
+    @Override
+    public Optional<Member> findById(String id){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM member WHERE id=?");
             stm.setString(1,id);
@@ -116,7 +135,8 @@ public class MemberDAOImpl {
         }
     }
 
-    public Member saveMember(Member member){
+    @Override
+    public Member save(Member member){
         try {
             PreparedStatement stm = connection.prepareStatement("INSERT INTO member (id,name,address,contact) VALUES (?,?,?,?)");
             stm.setString(1, member.getId());
@@ -133,7 +153,9 @@ public class MemberDAOImpl {
             throw new RuntimeException(e);
         }
     }
-    public Member updateMember(Member member){
+
+    @Override
+    public Member update(Member member){
         try {
             PreparedStatement stm = connection.prepareStatement("UPDATE member SET name=?, address=?, contact=? WHERE id=?");
             stm.setString(1, member.getName());
@@ -152,6 +174,7 @@ public class MemberDAOImpl {
 
     }
 
+    @Override
     public List<Member> findMembersByQuery(String query){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  member WHERE id LIKE ? OR  name LIKE ? OR address LIKE ? OR contact LIKE ?");
@@ -178,7 +201,7 @@ public class MemberDAOImpl {
         }
     }
 
-
+    @Override
     public List<Member> findMembersByQuery(String query,int size,int page){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM  member WHERE id LIKE ? OR  name LIKE ? OR address LIKE ? OR contact LIKE ? LIMIT ? OFFSET ?");

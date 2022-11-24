@@ -1,6 +1,7 @@
-package lk.ijse.dep9.dao.impl;
+package lk.ijse.dep9.dao.custom.impl;
 
 
+import lk.ijse.dep9.dao.custom.ReturnDAO;
 import lk.ijse.dep9.entity.Return;
 import lk.ijse.dep9.entity.ReturnPK;
 
@@ -10,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class ReturnDAOImpl {
+public class ReturnDAOImpl implements ReturnDAO {
 
     private Connection connection;
 
@@ -18,7 +19,8 @@ public class ReturnDAOImpl {
         this.connection = connection;
     }
 
-    public long countReturns(){
+    @Override
+    public long count(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT COUNT(isbn) FROM `return`");
             ResultSet rst = stm.executeQuery();
@@ -29,7 +31,8 @@ public class ReturnDAOImpl {
         }
     }
 
-    public void deleteReturnByPK(ReturnPK returnPK){
+    @Override
+    public void deleteById(ReturnPK returnPK){
         try {
             PreparedStatement stm = connection.prepareStatement("DELETE FROM `return` WHERE isbn=? AND issue_id=?");
             stm.setString(1, returnPK.getIsbn());
@@ -41,7 +44,9 @@ public class ReturnDAOImpl {
         }
 
     }
-    public boolean existsReturnByPK(ReturnPK returnPK){
+
+    @Override
+    public boolean existsById(ReturnPK returnPK){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM `return` WHERE isbn=? AND issue_id=?");
             stm.setString(1, returnPK.getIsbn());
@@ -53,7 +58,8 @@ public class ReturnDAOImpl {
 
     }
 
-    public List<Return> findAllReturns(){
+    @Override
+    public List<Return> findAll(){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM `return`");
             ResultSet rst = stm.executeQuery();
@@ -70,7 +76,9 @@ public class ReturnDAOImpl {
             throw new RuntimeException(e);
         }
     }
-    public Optional<Return> findReturnByPK(ReturnPK returnPK){
+
+    @Override
+    public Optional<Return> findById(ReturnPK returnPK){
         try {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM `return` WHERE isbn=? AND issue_id=?");
             stm.setString(1, returnPK.getIsbn());
@@ -92,7 +100,8 @@ public class ReturnDAOImpl {
 
     }
 
-    public Return saveReturn(Return returns){
+    @Override
+    public Return save(Return returns){
         try {
             PreparedStatement stm = connection.prepareStatement("INSERT INTO `return` (issue_id, isbn) VALUES (?,?)");
             stm.setInt(1,returns.getReturnPK().getIssueId());
@@ -108,10 +117,21 @@ public class ReturnDAOImpl {
 
     }
 
-/*    public IssueItem updateIssueItem(IssueItem issueItem){
-        return null;
-        primary key cannot update
-
-    }*/
+    @Override
+    public Return update(Return returnItem) {
+        try {
+            PreparedStatement stm = connection.prepareStatement("UPDATE `return` SET date = ? WHERE issue_id=? AND isbn=?");
+            stm.setDate(1, returnItem.getDate());
+            stm.setInt(2, returnItem.getReturnPK().getIssueId());
+            stm.setString(3, returnItem.getReturnPK().getIsbn());
+            if (stm.executeUpdate() == 1) {
+                return returnItem;
+            } else {
+                throw new SQLException("Failed to update the issue note");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 }
