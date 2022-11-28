@@ -11,7 +11,7 @@ import java.io.Serializable;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class IssueItemPK implements Serializable {
+public class   IssueItemPK implements Serializable {
     private int issueId;
     private String isbn;
 }

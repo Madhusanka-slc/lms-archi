@@ -7,9 +7,18 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import lk.ijse.dep9.api.exception.ValidationException;
 import lk.ijse.dep9.api.util.HttpServlet2;
 import lk.ijse.dep9.dto.ReturnDTO;
 import lk.ijse.dep9.dto.ReturnItemDTO;
+import lk.ijse.dep9.exception.ResponseStatusException;
+import lk.ijse.dep9.service.ServiceFactory;
+import lk.ijse.dep9.service.ServiceTypes;
+import lk.ijse.dep9.service.custom.ReturnService;
+import lk.ijse.dep9.util.ConnectionUtil;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -31,8 +40,7 @@ public class ReturnServlet extends HttpServlet2 {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (request.getPathInfo() != null && !request.getPathInfo().equals("/")) {
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
-            return;
+            throw new ResponseStatusException(501);
         }
 
         try {
@@ -44,86 +52,29 @@ public class ReturnServlet extends HttpServlet2 {
             ReturnDTO returnDTO = JsonbBuilder.create().fromJson(request.getReader(), ReturnDTO.class);
             addReturnItems(returnDTO, response);
         } catch (JsonbException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            throw new ValidationException(e.getMessage());
         }
 
     }
 
     private void addReturnItems(ReturnDTO returnDTO, HttpServletResponse response) throws IOException {
         /* Data Validation */
-        if (returnDTO.getMemberId() == null ||
-                !returnDTO.getMemberId().matches("([A-Fa-f0-9]{8}(-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12})")) {
-            throw new JsonbException("The member is invalid or empty");
-        } else if (returnDTO.getReturnItems().isEmpty()) {
-            throw new JsonbException("No items have been found");
-        } else if (returnDTO.getReturnItems().stream().anyMatch(Objects::isNull)) {
-            throw new JsonbException("Null items have been found in the list");
-        } else if (returnDTO.getReturnItems().stream().anyMatch(item ->
-                item.getIssueNoteId() == null || item.getIsbn() == null ||
-                        !item.getIsbn().matches("([0-9][0-9\\\\-]*[0-9])"))) {
-            throw new JsonbException("Some items are invalid");
-        }
-
-        Set<ReturnItemDTO> returnItems = returnDTO.getReturnItems().stream().collect(Collectors.toSet());
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        Set<ConstraintViolation<ReturnDTO>> violations = validator.validate(returnDTO);
+        violations.stream().findAny().ifPresent(violate -> {
+            throw new ValidationException(violate.getMessage());
+        });
 
         /* Business Validation */
         try (Connection connection = pool.getConnection()) {
-
-            PreparedStatement stm = connection.prepareStatement("SELECT * FROM issue_item " +
-                    "INNER JOIN issue_note `in` on issue_item.issue_id = `in`.id " +
-                    "WHERE member_id = ? AND issue_id = ? and isbn =?");
-            stm.setString(1, returnDTO.getMemberId());
-
-            PreparedStatement stm2 = connection.
-                    prepareStatement("SELECT * FROM `return` WHERE isbn = ? AND issue_id = ?");
-
-            PreparedStatement stm3 = connection.
-                    prepareStatement("INSERT INTO `return` (date, issue_id, isbn) VALUES (?, ?, ?)");
-
-            try {
-                connection.setAutoCommit(false);
-                for (ReturnItemDTO returnItem : returnItems) {
-                    stm.setInt(2, returnItem.getIssueNoteId());
-                    stm.setString(3, returnItem.getIsbn());
-
-                    stm2.setInt(1, returnItem.getIssueNoteId());
-                    stm2.setString(2, returnItem.getIsbn());
-
-                    if (!stm.executeQuery().next()) {
-                        throw new JsonbException( String.format("Either one of these %s, %s, %s doesn't exist or this return item " +
-                                        "is not belonged to this member",
-                                returnDTO.getMemberId(),
-                                returnItem.getIssueNoteId(),
-                                returnItem.getIsbn()));
-                    }
-
-                    if (stm2.executeQuery().next()) {
-                        throw new JsonbException("This " + returnItem.getIsbn() + " have been already returned");
-                    }
-
-                    stm3.setDate(1, Date.valueOf(LocalDate.now()));
-                    stm3.setInt(2, returnItem.getIssueNoteId());
-                    stm3.setString(3, returnItem.getIsbn());
-
-                    if (stm3.executeUpdate() != 1){
-                        throw new SQLException("Failed to insert a return item");
-                    }
-                }
-                connection.commit();
-                response.setStatus(HttpServletResponse.SC_CREATED);
-            }
-            catch (Throwable t){
-                connection.rollback();
-                if (t instanceof JsonbException) throw t;
-                t.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to return items");
-            }finally {
-                connection.setAutoCommit(true);
-            }
-
+            ConnectionUtil.setConnection(connection);
+            ReturnService returnService = ServiceFactory.getInstance().getService(ServiceTypes.RETURN);
+            returnService.updateReturnStatus(returnDTO);
+            response.setStatus(HttpServletResponse.SC_CREATED);
+            response.setContentType("application/json");
+            JsonbBuilder.create().toJson(returnDTO, response.getWriter());
         } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to return items");
+            throw new RuntimeException(e);
         }
     }
 

@@ -6,15 +6,26 @@ import jakarta.json.bind.JsonbException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import lk.ijse.dep9.api.exception.ValidationException;
 import lk.ijse.dep9.api.util.HttpServlet2;
 import lk.ijse.dep9.dto.BookDTO;
+import lk.ijse.dep9.exception.ResponseStatusException;
 import lk.ijse.dep9.service.BOLogic;
+import lk.ijse.dep9.service.ServiceFactory;
+import lk.ijse.dep9.service.ServiceTypes;
+import lk.ijse.dep9.service.custom.BookServicce;
 import lk.ijse.dep9.util.ConnectionUtil;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.rmi.RemoteException;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,15 +50,15 @@ public class BookServlet extends HttpServlet2 {
                     searchPaginatedBooks(query, Integer.parseInt(size), Integer.parseInt(page), response);
                 }
             } else if (query != null) {
-                searchBooks(query, response);
+                //searchBooks(query, response);
             } else if (size != null && page != null) {
                 if (!size.matches("\\d+") || !page.matches("\\d+")) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid page or size");
                 } else {
-                    loadAllPaginatedBooks(Integer.parseInt(size), Integer.parseInt(page), response);
+                    //loadAllPaginatedBooks(Integer.parseInt(size), Integer.parseInt(page), response);
                 }
             } else {
-                loadAllBooks(response);
+                //loadAllBooks(response);
             }
         } else {
             Matcher matcher = Pattern.compile("^/([0-9][0-9\\\\-]*[0-9])/?$")
@@ -55,7 +66,7 @@ public class BookServlet extends HttpServlet2 {
             if (matcher.matches()) {
                 getBookDetails(matcher.group(1), response);
             } else {
-                response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
+                throw new ResponseStatusException(501);
             }
         }
     }
@@ -64,16 +75,15 @@ public class BookServlet extends HttpServlet2 {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (request.getPathInfo() == null || request.getPathInfo().equals("/")) {
             saveBook(request, response);
-        }else{
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
+        } else {
+            throw new ResponseStatusException(501);
         }
     }
 
     @Override
     protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (request.getPathInfo() == null || request.getPathInfo().equals("/")) {
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
-            return;
+            throw new ResponseStatusException(501);
         }
 
         Matcher matcher = Pattern.
@@ -82,154 +92,34 @@ public class BookServlet extends HttpServlet2 {
         if (matcher.matches()) {
             updateBookDetails(matcher.group(1), request, response);
         } else {
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
+            throw new ResponseStatusException(501);
         }
     }
 
-    private void loadAllBooks(HttpServletResponse response) throws IOException {
-        try (Connection connection = pool.getConnection()) {
-            Statement stm = connection.createStatement();
-            String sql = "SELECT * FROM book";
-            ResultSet rst = stm.executeQuery(sql);
-            ArrayList<BookDTO> books = new ArrayList<>();
 
-            while (rst.next()) {
-                String isbn = rst.getString("isbn");
-                String title = rst.getString("title");
-                String author = rst.getString("author");
-                int copies = rst.getInt("copies");
-                books.add(new BookDTO(isbn, title, author, copies));
-            }
-
-            response.setContentType("application/json");
-            JsonbBuilder.create().toJson(books, response.getWriter());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to fetch books");
-        }
-    }
-
-    private void loadAllPaginatedBooks(int size, int page, HttpServletResponse response) throws IOException {
-        try (Connection connection = pool.getConnection()) {
-            Statement stmCount = connection.createStatement();
-            PreparedStatement stm = connection.prepareStatement("SELECT * FROM book LIMIT ? OFFSET ?");
-            String sql = "SELECT COUNT(isbn) FROM book";
-
-            ResultSet rst = stmCount.executeQuery(sql);
-            rst.next();
-
-            int totalBooks = rst.getInt(1);
-            response.addIntHeader("X-Total-Count", totalBooks);
-
-            stm.setInt(1, size);
-            stm.setInt(2, (page - 1) * size);
-            ResultSet rst2 = stm.executeQuery();
-
-            ArrayList<BookDTO> books = new ArrayList<>();
-
-            while (rst2.next()) {
-                String isbn = rst2.getString("isbn");
-                String title = rst2.getString("title");
-                String author = rst2.getString("author");
-                int copies = rst2.getInt("copies");
-                books.add(new BookDTO(isbn, title, author, copies));
-            }
-
-            response.setContentType("application/json");
-            JsonbBuilder.create().toJson(books, response.getWriter());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to fetch books");
-        }
-    }
-
-    private void searchBooks(String query, HttpServletResponse response) throws IOException {
-        try (Connection connection = pool.getConnection()) {
-            PreparedStatement stm = connection.
-                    prepareStatement("SELECT * FROM book WHERE isbn LIKE ? OR title LIKE ? OR author LIKE ?");
-            query = "%" + query + "%";
-            stm.setString(1, query);
-            stm.setString(2, query);
-            stm.setString(3, query);
-            ResultSet rst = stm.executeQuery();
-            ArrayList<BookDTO> books = new ArrayList<>();
-
-            while (rst.next()) {
-                String isbn = rst.getString("isbn");
-                String title = rst.getString("title");
-                String author = rst.getString("author");
-                int copies = rst.getInt("copies");
-                books.add(new BookDTO(isbn, title, author, copies));
-            }
-
-            response.setContentType("application/json");
-            JsonbBuilder.create().toJson(books, response.getWriter());
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to fetch books");
-        }
-    }
 
     private void searchPaginatedBooks(String query, int size, int page, HttpServletResponse response) throws IOException {
         try (Connection connection = pool.getConnection()) {
-            PreparedStatement stmCount = connection.prepareStatement("SELECT COUNT(isbn) FROM book WHERE isbn LIKE ? OR title LIKE ? OR author LIKE ?");
-            PreparedStatement stm = connection.prepareStatement("SELECT * FROM book WHERE isbn LIKE ? OR title LIKE ? OR author LIKE ? LIMIT ? OFFSET ?");
-
-            query = "%" + query + "%";
-            stmCount.setString(1, query);
-            stmCount.setString(2, query);
-            stmCount.setString(3, query);
-            ResultSet rst = stmCount.executeQuery();
-            rst.next();
-
-            int totalBooks = rst.getInt(1);
-            response.addIntHeader("X-Total-Count", totalBooks);
-
-            stm.setString(1, query);
-            stm.setString(2, query);
-            stm.setString(3, query);
-            stm.setInt(4, size);
-            stm.setInt(5, (page - 1) * size);
-
-            ResultSet rst2 = stm.executeQuery();
-
-            ArrayList<BookDTO> books = new ArrayList<>();
-
-            while (rst2.next()) {
-                String isbn = rst2.getString("isbn");
-                String title = rst2.getString("title");
-                String author = rst2.getString("author");
-                int copies = rst2.getInt("copies");
-                books.add(new BookDTO(isbn, title, author, copies));
-            }
-
+            ConnectionUtil.setConnection(connection);
+            BookServicce bookService= ServiceFactory.getInstance().getService(ServiceTypes.BOOK);
+            List<BookDTO> books = bookService.findBooks(query, size, page);
+            response.setIntHeader("X-Total-Count", books.size());
             response.setContentType("application/json");
             JsonbBuilder.create().toJson(books, response.getWriter());
         } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to fetch books");
+            throw new RuntimeException(e);
         }
     }
 
     private void getBookDetails(String isbn, HttpServletResponse response) throws IOException {
         try (Connection connection = pool.getConnection()) {
-            PreparedStatement stm = connection.prepareStatement("SELECT * FROM book WHERE isbn=?");
-            stm.setString(1, isbn);
-            ResultSet rst = stm.executeQuery();
-            if (rst.next()) {
-                String title = rst.getString("title");
-                String author = rst.getString("author");
-                int copies = rst.getInt("copies");
-                BookDTO book = new BookDTO(isbn, title, author, copies);
-                response.setContentType("application/json");
-                JsonbBuilder.create().toJson(book, response.getWriter());
-            } else {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Invalid book isbn");
-            }
+            ConnectionUtil.setConnection(connection);
+            BookServicce bookService = ServiceFactory.getInstance().getService(ServiceTypes.BOOK);
+            BookDTO bookDetails = bookService.getBookDetails(isbn);
+            response.setContentType("application/json");
+            JsonbBuilder.create().toJson(bookDetails, response.getWriter());
         } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to fetch the book details");
+            throw new RuntimeException(e);
         }
     }
 
@@ -242,36 +132,24 @@ public class BookServlet extends HttpServlet2 {
             BookDTO book = JsonbBuilder.create().
                     fromJson(request.getReader(), BookDTO.class);
 
-            if(book.getIsbn() == null || !book.getIsbn().matches("([0-9][0-9\\\\-]*[0-9])")){
-                throw new JsonbException("Book isbn is empty or invalid");
-            }else if (book.getTitle() == null ||
-                    !book.getTitle().matches(".+")) {
-                throw new JsonbException("Book title is empty or invalid");
-            } else if (book.getAuthor() == null ||
-                    !book.getAuthor().matches("[A-Za-z ]+")) {
-                throw new JsonbException("Author is empty or invalid");
-            } else if (book.getCopies() == null ||
-                    book.getCopies() < 1) {
-                throw new JsonbException("Copies is empty or invalid");
-            }
+            Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+            Set<ConstraintViolation<BookDTO>> violations = validator.validate(book);
+            violations.stream().findAny().ifPresent(violation -> {
+                throw new ValidationException(violation.getMessage());
+            });
 
             try (Connection connection = pool.getConnection()) {
                 ConnectionUtil.setConnection(connection);
-
-
-                if (BOLogic.saveBook(book)) {
-                    response.setStatus(HttpServletResponse.SC_CREATED);
-                    response.setContentType("application/json");
-                    JsonbBuilder.create().toJson(book, response.getWriter());
-                } else {
-                    throw new SQLException("Something went wrong");
-                }
+                BookServicce bookService = ServiceFactory.getInstance().getService(ServiceTypes.BOOK);
+                bookService.addNewBook(book);
+                response.setStatus(HttpServletResponse.SC_CREATED);
+                response.setContentType("application/json");
+                JsonbBuilder.create().toJson(book, response.getWriter());
             } catch (SQLException e) {
-                e.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+                throw new RuntimeException(e);
             }
         } catch (JsonbException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            throw new ValidationException(e.getMessage());
         }
     }
 
@@ -282,33 +160,24 @@ public class BookServlet extends HttpServlet2 {
             }
             BookDTO book = JsonbBuilder.create().fromJson(request.getReader(), BookDTO.class);
 
-            if (book.getIsbn() == null || !book.getIsbn().equalsIgnoreCase(isbn)) {
-                throw new JsonbException("Book ISBN is empty or invalid");
-            }else if (book.getTitle() == null ||
-                    !book.getTitle().matches(".+")) {
-                throw new JsonbException("Book title is empty or invalid");
-            } else if (book.getAuthor() == null ||
-                    !book.getAuthor().matches("[A-Za-z ]+")) {
-                throw new JsonbException("Author is empty or invalid");
-            } else if (book.getCopies() == null ||
-                    book.getCopies() < 1) {
-                throw new JsonbException("Copies is empty or invalid");
-            }
+            Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+            Set<ConstraintViolation<BookDTO>> violations = validator.validate(book);
+            violations.stream().findAny().ifPresent(violation -> {
+                throw new ValidationException(violation.getMessage());
+            });
+
+            if (!book.getIsbn().equals(isbn)) throw new ValidationException("Book isbns are mismatched");
 
             try (Connection connection = pool.getConnection()) {
                 ConnectionUtil.setConnection(connection);
-
-                if (BOLogic.updateBook(book)) {
-                    response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-                } else {
-                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Book does not exist");
-                }
+                BookServicce bookService = ServiceFactory.getInstance().getService(ServiceTypes.BOOK);
+                bookService.updateBookDetails(book);
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } catch (SQLException e) {
-                e.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to update the book");
+                throw new RuntimeException(e);
             }
         } catch (JsonbException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            throw new ValidationException(e.getMessage());
         }
     }
 }

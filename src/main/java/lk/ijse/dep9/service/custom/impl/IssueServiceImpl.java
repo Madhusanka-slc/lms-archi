@@ -68,9 +68,14 @@ public class IssueServiceImpl implements IssueService {
 
             IssueNote issueNote = converter.toIssueNote(issueNoteDTO);
             List<IssueItem> issueItemList = converter.toIssueItemList(issueNoteDTO);
-            issueNoteDAO.save(issueNote);
 
-            issueItemList.forEach(issueItemDAO::save);
+            int issueNoteId = issueNoteDAO.save(issueNote).getId();
+            issueItemList.forEach(item->{
+                item.getIssueItemPK().setIssueId(issueNoteId);
+                issueItemDAO.save(item);
+            });
+
+
             ConnectionUtil.getConnection().commit();
         } catch (Throwable t) {
 

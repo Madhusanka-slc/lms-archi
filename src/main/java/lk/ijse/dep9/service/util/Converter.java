@@ -1,13 +1,8 @@
 package lk.ijse.dep9.service.util;
 
 import jdk.dynalink.linker.LinkerServices;
-import lk.ijse.dep9.dto.BookDTO;
-import lk.ijse.dep9.dto.IssueNoteDTO;
-import lk.ijse.dep9.dto.MemberDTO;
-import lk.ijse.dep9.entity.Book;
-import lk.ijse.dep9.entity.IssueItem;
-import lk.ijse.dep9.entity.IssueNote;
-import lk.ijse.dep9.entity.Member;
+import lk.ijse.dep9.dto.*;
+import lk.ijse.dep9.entity.*;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.modelmapper.internal.bytebuddy.description.method.MethodDescription;
@@ -63,5 +58,14 @@ public class Converter {
 
         return mapper.map(issueNoteDTO,typeToken);
 
+    }
+
+    public Return toReturn(ReturnItemDTO returnItemDTO){
+
+        mapper.typeMap(ReturnItemDTO.class,Return.class).
+                setConverter(mc ->
+            new Return(null,mc.getSource().getIssueNoteId(),mc.getSource().getIsbn()));
+
+        return mapper.map(returnItemDTO,Return.class);
     }
 }
